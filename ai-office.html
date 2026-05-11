@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI OFFICE — NYC</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05050f;--panel:#08081a;--border:#1a1a3a;
+  --accent:#c8b8ff;--green:#7fffd4;--amber:#ffd700;
+  --text:#b0b0d0;--dim:#404060;--red:#ff6b6b;
+}
+body{background:var(--bg);color:var(--text);font-family:'VT323',monospace;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px;background:rgba(8,8,26,0.95);border-bottom:1px solid var(--border);flex-shrink:0;backdrop-filter:blur(4px)}
+.logo{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--accent);letter-spacing:3px}
+.topstats{display:flex;gap:20px;font-size:13px}
+.topstat{color:var(--dim)}.topstat span{color:var(--green)}
+.blink{animation:blink 1.2s step-end infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+#main{display:flex;flex:1;min-height:0;gap:0}
+
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;image-rendering:pixelated}
+#tooltip{position:absolute;background:rgba(5,5,20,0.97);color:var(--text);font-family:'VT323',monospace;font-size:17px;padding:10px 14px;border:1px solid var(--accent);pointer-events:none;display:none;white-space:nowrap;z-index:20;line-height:1.5;max-width:260px}
+#tooltip b{color:var(--amber);font-family:'Press Start 2P',monospace;font-size:7px;display:block;margin-bottom:4px;letter-spacing:1px}
+#tooltip .t-role{color:var(--accent);font-size:15px}
+#tooltip .t-fit{color:#c084fc;font-size:13px;margin-top:2px}
+#tooltip .t-task{color:var(--dim);font-size:13px}
+
+#sidebar{width:230px;background:rgba(8,8,26,0.98);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.s-panel{padding:12px;border-bottom:1px solid var(--border)}
+.s-title{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--accent);letter-spacing:2px;margin-bottom:10px;opacity:.7}
+
+.emp-row{display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border:1px solid transparent;transition:all .15s;margin-bottom:2px}
+.emp-row:hover,.emp-row.sel{border-color:var(--accent);background:rgba(200,184,255,0.06)}
+.emp-av{width:22px;height:26px;image-rendering:pixelated;flex-shrink:0}
+.emp-info{flex:1;min-width:0}
+.emp-name{font-size:15px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.emp-brand{font-size:12px;color:#c084fc}
+.emp-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;animation:pulse 2.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+
+.task-item{padding:5px 6px;margin-bottom:4px;border-left:2px solid;font-size:13px;line-height:1.4}
+.task-item.doing{border-color:var(--accent);background:rgba(200,184,255,0.04)}
+.task-item.done{border-color:var(--green);background:rgba(127,255,212,0.03)}
+.t-who{font-size:11px;margin-bottom:1px}
+.t-what{color:var(--text)}
+.t-st{font-size:11px;margin-top:1px}
+
+.stat-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:13px}
+.stat-row:last-child{border:none}
+.stat-val{color:var(--amber)}
+
+#task-wrap{display:flex;gap:6px;margin-top:8px}
+#task-inp{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'VT323',monospace;font-size:15px;padding:4px 8px;outline:none;min-width:0}
+#task-inp:focus{border-color:var(--accent)}
+#task-btn{background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:'Press Start 2P',monospace;font-size:6px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+#task-btn:hover{background:rgba(200,184,255,0.1)}
+
+#logbar{padding:6px 14px;background:rgba(8,8,26,0.95);border-top:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.log-pre{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--accent)}
+#log-txt{color:var(--green)}
+
+#clock-bar{padding:4px 14px;background:rgba(5,5,15,0.98);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;font-size:12px}
+#clock{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--green)}
+.weather{color:var(--dim)}
+
+@media(max-width:640px){#sidebar{display:none}}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo">◆ AI ОФИС / НЬЮ-ЙОРК</div>
+  <div class="topstats">
+    <div class="topstat">КОМАНДА <span id="sc">6</span></div>
+    <div class="topstat">ОНЛАЙН <span class="blink">●</span></div>
+    <div class="topstat">ЗАДАЧИ <span id="st">3</span></div>
+    <div class="topstat">ЭТАЖ <span>47</span></div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+    <div id="tooltip"><b></b><div class="t-role"></div><div class="t-fit"></div><div class="t-task"></div></div>
+  </div>
+
+  <div id="sidebar">
+    <div class="s-panel">
+      <div class="s-title">◆ КОМАНДА</div>
+      <div id="team-list"></div>
+    </div>
+    <div class="s-panel" style="flex:1;overflow-y:auto;min-height:0">
+      <div class="s-title">◆ ЗАДАЧИ</div>
+      <div id="task-list"></div>
+      <div id="task-wrap">
+        <input id="task-inp" placeholder="Новая задача..." maxlength="40">
+        <button id="task-btn">+ ДОБАВИТЬ</button>
+      </div>
+    </div>
+    <div class="s-panel">
+      <div class="s-title">◆ СТАТИСТИКА</div>
+      <div class="stat-row"><span>Видео готово</span><span class="stat-val" id="sv">0</span></div>
+      <div class="stat-row"><span>Сценариев</span><span class="stat-val" id="ss">0</span></div>
+      <div class="stat-row"><span>Обложек</span><span class="stat-val" id="sc2">0</span></div>
+      <div class="stat-row"><span>Часов работы</span><span class="stat-val" id="sh">0.00</span></div>
+    </div>
+  </div>
+</div>
+
+<div id="logbar">
+  <span class="log-pre">&gt;&gt;</span>
+  <span id="log-txt">Нажми на сотрудника чтобы выбрать его и назначить задачу</span>
+</div>
+<div id="clock-bar">
+  <div class="weather">🌧 Нью-Йорк · 47-й этаж · Дождь</div>
+  <div id="clock">00:00:00</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvas-wrap');
+let W=800,H=500;
+function resize(){W=wrap.clientWidth;H=wrap.clientHeight;canvas.width=W;canvas.height=H;}
+resize();window.addEventListener('resize',resize);
+
+// ─── EMPLOYEES ───
+const EMP=[
+  {id:'ceo',   name:'Ты (CEO)',    role:'Директор',        brand:'Rick Owens SS25',  outfit:'#1a1a1a',skin:'#c8a882',hair:'#0a0a0a',accent:'#ffffff',task:'Стратегия и решения',  status:'Управляет',    rx:.50,ry:.42,isCeo:true},
+  {id:'writer',name:'Писатель',   role:'Контент AI',      brand:'Balenciaga FW24',  outfit:'#0d0d0d',skin:'#8d6e63',hair:'#1a0a00',accent:'#c0c0c0',task:'Сценарии и тексты',    status:'Пишет...',     rx:.18,ry:.56},
+  {id:'design',name:'Дизайнер',   role:'Визуал AI',       brand:'Maison Margiela',  outfit:'#f0ede8',skin:'#d4a574',hair:'#2a1a0a',accent:'#888888',task:'Обложки и изображения',status:'Рисует...',    rx:.34,ry:.62},
+  {id:'voice', name:'Голос',      role:'Аудио AI',        brand:'Dries Van Noten',  outfit:'#1c1c2e',skin:'#b08060',hair:'#0a0a0a',accent:'#9090ff',task:'Озвучка роликов',      status:'Записывает...', rx:.50,ry:.62},
+  {id:'analyst',name:'Аналитик',  role:'Исследования AI', brand:'Y-3 Yamamoto',     outfit:'#0a0a0a',skin:'#e8c49a',hair:'#1a1000',accent:'#ffffff',task:'Тренды и данные',      status:'Анализирует...',rx:.66,ry:.56},
+  {id:'editor',name:'Редактор',   role:'Контроль AI',     brand:'Prada Linea Rossa',outfit:'#1a0a1a',skin:'#c8b090',hair:'#0a0808',accent:'#d0a0d0',task:'Проверка и полировка', status:'Редактирует...',rx:.82,ry:.62},
+];
+
+// ─── STATE ───
+let sel=null,hov=null,frame=0;
+let tasks=[
+  {who:'Писатель', what:'Сценарий эп.1 — история AI', status:'doing'},
+  {who:'Дизайнер', what:'Обложка пилотного выпуска',  status:'doing'},
+  {who:'Аналитик', what:'Топ-10 ниш YouTube',         status:'done'},
+];
+let stats={v:0,s:0,c:0};
+let t0=Date.now();
+
+// ─── RAIN ───
+let drops=[];
+function initRain(){drops=[];for(let i=0;i<180;i++)drops.push({x:Math.random()*W,y:Math.random()*H,spd:3+Math.random()*4,len:8+Math.random()*16,a:0.15+Math.random()*0.25});}
+initRain();
+
+// ─── PARTICLES (office dust / bokeh) ───
+let bokeh=[];
+for(let i=0;i<25;i++)bokeh.push({x:Math.random()*W,y:Math.random()*H*.85,r:1+Math.random()*3,a:Math.random()*.4,va:.003+Math.random()*.004,vx:(Math.random()-.5)*.15});
+
+// ─── NYC SKYLINE ───
+function buildSkyline(seed){
+  let b=[];
+  let x=0,rng=n=>(Math.sin(seed*n+n*1.7)*.5+.5);
+  while(x<W){
+    let w=Math.floor(W*.04+rng(x)*(W*.06));
+    let h=Math.floor(H*.15+rng(x+7)*(H*.45));
+    let floors=Math.floor(h/8);
+    b.push({x,w,h,floors,r:rng(x+3),g:rng(x+5)});
+    x+=w+Math.floor(rng(x+11)*(W*.02));
+  }
+  return b;
+}
+const SKYLINE=buildSkyline(42);
+
+// ─── DRAW FUNCTIONS ───
+
+function drawSky(){
+  // deep night gradient manual
+  let grad=ctx.createLinearGradient(0,0,0,H*.72);
+  grad.addColorStop(0,'#02020a');
+  grad.addColorStop(.4,'#05051a');
+  grad.addColorStop(1,'#0a0820');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H*.72);
+}
+
+function drawCityGlow(){
+  // horizon glow
+  let g=ctx.createRadialGradient(W/2,H*.68,0,W/2,H*.68,W*.6);
+  g.addColorStop(0,'rgba(255,140,40,0.18)');
+  g.addColorStop(.4,'rgba(200,100,200,0.06)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;
+  ctx.fillRect(0,H*.3,W,H*.45);
+}
+
+function drawNYC(){
+  SKYLINE.forEach(b=>{
+    let bx=b.x, by=H*.68-b.h, bw=b.w, bh=b.h;
+    // building body
+    let dark=`rgb(${8+Math.floor(b.r*8)},${8+Math.floor(b.g*6)},${18+Math.floor(b.r*12)})`;
+    ctx.fillStyle=dark;
+    ctx.fillRect(bx,by,bw,bh);
+    // windows grid
+    let fw=4,fh=5,fx=2,fy=6;
+    for(let row=0;row<b.floors-1;row++){
+      for(let col=0;col<Math.floor((bw-4)/( fw+fx));col++){
+        let wx=bx+2+col*(fw+fx), wy=by+fy+row*(fh+3);
+        if(wy>H*.68-10) continue;
+        let lit=Math.sin(b.r*7+col*1.3+row*2.1+frame*.003)>.1;
+        if(lit){
+          let warm=Math.random()>.7;
+          ctx.fillStyle=warm?`rgba(255,210,120,${0.4+b.r*.3})`:`rgba(160,180,255,${0.3+b.g*.25})`;
+          ctx.fillRect(wx,wy,fw,fh);
+        } else {
+          ctx.fillStyle='rgba(255,255,255,0.03)';
+          ctx.fillRect(wx,wy,fw,fh);
+        }
+      }
+    }
+    // roof details
+    if(b.w>20){ctx.fillStyle='rgba(200,150,255,0.15)';ctx.fillRect(bx+bw/2-1,by-4,2,4);}
+    // aerial light blink
+    if(b.h>H*.25&&Math.floor(frame*.02+b.r*10)%2===0){ctx.fillStyle='rgba(255,60,60,0.8)';ctx.fillRect(bx+bw/2-1,by-2,2,2);}
+  });
+}
+
+function drawGround(){
+  // street glow at base
+  let g=ctx.createLinearGradient(0,H*.66,0,H*.72);
+  g.addColorStop(0,'rgba(255,120,30,0.08)');
+  g.addColorStop(1,'rgba(255,80,20,0.25)');
+  ctx.fillStyle=g;ctx.fillRect(0,H*.66,W,H*.06);
+  ctx.fillStyle='#030310';ctx.fillRect(0,H*.69,W,H*.31);
+}
+
+function drawWindow(){
+  // panoramic window frame
+  let wTop=H*.05, wBot=H*.7;
+  let frameW=12;
+  // outer frame
+  ctx.fillStyle='#0a0a1a';
+  ctx.fillRect(0,wTop-frameW,W,frameW); // top
+  ctx.fillRect(0,wBot,W,frameW); // bottom
+  // vertical mullions (window frames)
+  let cols=5;
+  for(let i=0;i<=cols;i++){
+    let fx=Math.floor((W/cols)*i);
+    ctx.fillStyle='#070714';
+    ctx.fillRect(fx-4,wTop-frameW,8,wBot-wTop+frameW*2);
+  }
+  // glass reflection sheen
+  ctx.fillStyle='rgba(100,120,255,0.03)';
+  for(let i=0;i<cols;i++){
+    let fx=Math.floor((W/cols)*i)+8;
+    ctx.fillRect(fx,wTop,14,wBot-wTop);
+  }
+  // rain streaks ON glass
+  ctx.save();
+  ctx.beginPath();ctx.rect(0,wTop,W,wBot-wTop);ctx.clip();
+  drops.forEach(d=>{
+    ctx.strokeStyle=`rgba(140,160,220,${d.a*.6})`;
+    ctx.lineWidth=.7;
+    ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x+d.len*.15,d.y+d.len);ctx.stroke();
+  });
+  // rain puddle reflections at bottom
+  SKYLINE.forEach(b=>{
+    if(Math.floor(b.r*10)%3!==0) return;
+    let rx=b.x+b.w/2, ry=wBot-8;
+    let refH=Math.min(20,b.h*.05);
+    let refG=ctx.createLinearGradient(0,ry-refH,0,ry);
+    refG.addColorStop(0,'rgba(255,200,100,0)');
+    refG.addColorStop(1,`rgba(255,200,100,${0.06+b.r*.04})`);
+    ctx.fillStyle=refG;
+    ctx.fillRect(rx-b.w*.3,ry-refH,b.w*.6,refH);
+  });
+  ctx.restore();
+}
+
+function drawFloor(){
+  // glossy dark floor
+  let fTop=H*.7;
+  ctx.fillStyle='#07070f';ctx.fillRect(0,fTop,W,H-fTop);
+  // floor grid lines (marble/concrete texture)
+  ctx.strokeStyle='rgba(30,30,60,0.8)';ctx.lineWidth=.5;
+  for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,fTop);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=fTop;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // light pools under each desk lamp
+  EMP.forEach(e=>{
+    if(e.isCeo) return;
+    let ex=Math.floor(W*e.rx),ey=Math.floor(H*e.ry);
+    let g=ctx.createRadialGradient(ex,H*.76,0,ex,H*.76,60);
+    g.addColorStop(0,'rgba(200,184,255,0.06)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(ex-70,fTop,140,H-fTop);
+  });
+}
+
+function drawDesk(cx,cy,w,isCeo){
+  let S=Math.max(2,Math.floor(W/130));
+  let h=S*3, dh=S*4;
+  let x=cx-w/2, y=cy;
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(x+4,y+4,w,dh+h+S*4);
+  // legs
+  ctx.fillStyle='#1a1a2a';ctx.fillRect(x+S,y+dh+h,S*2,S*5);ctx.fillRect(x+w-S*3,y+dh+h,S*2,S*5);
+  // tabletop surface
+  ctx.fillStyle='#111120';ctx.fillRect(x,y,w,dh);
+  ctx.fillStyle='#1a1a30';ctx.fillRect(x,y,w,S);
+  // desk details - keyboard
+  ctx.fillStyle='#0d0d1d';ctx.fillRect(cx-w*.2,y+S*1.5,w*.35,S*1.2);
+  // monitor
+  let mw=w*.3,mh=S*8,mx=cx-mw/2,my=y-mh-S;
+  ctx.fillStyle='#080810';ctx.fillRect(mx-S,my-S,mw+S*2,mh+S*2);
+  // screen
+  let pulse=Math.sin(frame*.05+cx)*.5+.5;
+  ctx.fillStyle='#010118';ctx.fillRect(mx,my,mw,mh);
+  ctx.fillStyle=`rgba(80,60,200,${0.15+pulse*.1})`;ctx.fillRect(mx,my,mw,mh);
+  // screen content lines
+  for(let i=0;i<5;i++){
+    let lw=mw*.3+Math.sin(frame*.03+i*1.2+cx)*mw*.25;
+    ctx.fillStyle=`rgba(160,140,255,${0.4+pulse*.2})`;
+    ctx.fillRect(mx+S,my+S+i*(S*1.4),lw,S*.8);
+  }
+  // monitor stand
+  ctx.fillStyle='#080810';ctx.fillRect(cx-S,my+mh,S*2,S*2);ctx.fillRect(cx-S*3,my+mh+S*2,S*6,S);
+  // desk lamp
+  if(!isCeo){
+    ctx.fillStyle='#1a1a2a';ctx.fillRect(x+w-S*4,y-S*5,S,S*5);
+    ctx.fillStyle=`rgba(255,240,180,${0.3+pulse*.15})`;
+    ctx.beginPath();ctx.ellipse(x+w-S*3.5,y-S*5,S*3,S*1.5,0,0,Math.PI*2);ctx.fill();
+  }
+  // coffee cup
+  ctx.fillStyle='#0a0a18';ctx.fillRect(cx+w*.25,y+S,S*3,S*3);
+  ctx.fillStyle=`rgba(180,120,60,${0.5+pulse*.2})`;ctx.fillRect(cx+w*.25+1,y+S+1,S*3-2,S);
+}
+
+function drawChar(e){
+  let cx=Math.floor(W*e.rx), cy=Math.floor(H*e.ry);
+  let S=Math.max(2,Math.floor(W/110));
+  let bob=Math.sin(frame*.035+e.rx*9)*(S*.5);
+  let by=Math.floor(bob);
+  let isSel=sel===e.id, isHov=hov===e.id;
+
+  // selection glow
+  if(isSel){
+    let g=ctx.createRadialGradient(cx,cy+S*10,0,cx,cy+S*10,S*12);
+    g.addColorStop(0,'rgba(200,184,255,0.2)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy+S*10,S*12,0,Math.PI*2);ctx.fill();
+  }
+
+  // shadow
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.beginPath();ctx.ellipse(cx,cy+S*15+by,S*4,S,0,0,Math.PI*2);ctx.fill();
+
+  // ── OUTFIT LAYERS (fashion silhouette) ──
+  // oversized coat / long outerwear
+  let coat=e.isCeo?'#111111':e.outfit;
+  ctx.fillStyle=coat;
+  // coat body (wide, dropped shoulders)
+  ctx.fillRect(cx-S*4,cy+S*4+by,S*8,S*10);
+  // collar
+  ctx.fillStyle=e.accent;ctx.fillRect(cx-S,cy+S*4+by,S*2,S*2);
+  // lapels
+  ctx.fillStyle=coat;ctx.fillRect(cx-S*3,cy+S*3+by,S*2,S*4);ctx.fillRect(cx+S,cy+S*3+by,S*2,S*4);
+  // long coat hem
+  ctx.fillStyle=coat;ctx.fillRect(cx-S*3,cy+S*14+by,S*6,S*4);
+  // trousers (wide leg)
+  ctx.fillStyle='#0a0a12';
+  ctx.fillRect(cx-S*3,cy+S*14+by,S*2.5,S*8);
+  ctx.fillRect(cx+S*.5,cy+S*14+by,S*2.5,S*8);
+  // boots / chunky shoes
+  ctx.fillStyle='#050508';
+  ctx.fillRect(cx-S*3.5,cy+S*22+by,S*3.5,S*2);
+  ctx.fillRect(cx+S*.5,cy+S*22+by,S*3.5,S*2);
+  // boot detail
+  ctx.fillStyle=e.accent;
+  ctx.fillRect(cx-S*3.5,cy+S*22+by,S*3.5,1);
+  ctx.fillRect(cx+S*.5,cy+S*22+by,S*3.5,1);
+
+  // arms (long sleeves, relaxed)
+  ctx.fillStyle=coat;
+  ctx.fillRect(cx-S*6,cy+S*5+by,S*2,S*8);// left arm
+  ctx.fillRect(cx+S*4,cy+S*5+by,S*2,S*8);// right arm
+  // hands
+  ctx.fillStyle=e.skin;
+  ctx.fillRect(cx-S*6,cy+S*13+by,S*2,S*2);
+  ctx.fillRect(cx+S*4,cy+S*13+by,S*2,S*2);
+
+  // HEAD
+  ctx.fillStyle=e.skin;ctx.fillRect(cx-S*2,cy+S*1+by,S*4,S*4);
+  // neck
+  ctx.fillStyle=e.skin;ctx.fillRect(cx-S,cy+S*5+by,S*2,S);
+  // hair
+  ctx.fillStyle=e.hair;
+  ctx.fillRect(cx-S*2,cy+by,S*4,S*2);// top
+  ctx.fillRect(cx-S*2,cy+by,S,S*3);// left
+  ctx.fillRect(cx+S,cy+by,S,S*3);// right
+  // eyes
+  ctx.fillStyle='#080810';
+  ctx.fillRect(cx-S,cy+S*2+by,S,S);ctx.fillRect(cx+S*.3,cy+S*2+by,S,S);
+  // eye glint
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.fillRect(cx-S+1,cy+S*2+by,1,1);ctx.fillRect(cx+S*.3+1,cy+S*2+by,1,1);
+  // CEO has sunglasses (Rick Owens style)
+  if(e.isCeo){
+    ctx.fillStyle='#050508';ctx.fillRect(cx-S*1.5,cy+S*2+by,S*3.5,S*1.2);
+    ctx.strokeStyle='#1a1a2a';ctx.lineWidth=.5;ctx.strokeRect(cx-S*1.5,cy+S*2+by,S*3.5,S*1.2);
+  }
+  // mouth subtle
+  ctx.fillStyle='rgba(0,0,0,0.3)';ctx.fillRect(cx-S*.5,cy+S*4+by,S,1);
+
+  // STATUS BUBBLE
+  let blink=Math.floor(frame*.022)%2===0;
+  let bx=cx-S*7,buby=cy+by-S*4,bw2=S*14,bh2=S*3;
+  ctx.fillStyle='rgba(5,5,20,0.92)';ctx.fillRect(bx,buby,bw2,bh2);
+  ctx.strokeStyle=blink?'rgba(200,184,255,0.6)':'rgba(100,90,150,0.4)';ctx.lineWidth=.5;ctx.strokeRect(bx,buby,bw2,bh2);
+  ctx.fillStyle=blink?'#c8b8ff':'#605880';
+  ctx.font=`${Math.max(9,S*1.8)}px VT323`;ctx.textAlign='center';
+  ctx.fillText(e.status,bx+bw2/2,buby+bh2*.72);
+}
+
+function hitTest(mx,my){
+  let S=Math.max(2,Math.floor(W/110));
+  return EMP.find(e=>{
+    let cx=Math.floor(W*e.rx),cy=Math.floor(H*e.ry);
+    return mx>cx-S*7&&mx<cx+S*7&&my>cy-S*4&&my<cy+S*24;
+  });
+}
+
+// ─── RENDER SIDEBAR ───
+function renderTeam(){
+  document.getElementById('team-list').innerHTML=EMP.map(e=>`
+    <div class="emp-row${sel===e.id?' sel':''}" onclick="pickEmp('${e.id}')">
+      <canvas class="emp-av" width="22" height="26" id="av${e.id}"></canvas>
+      <div class="emp-info">
+        <div class="emp-name">${e.name}</div>
+        <div class="emp-brand">${e.brand}</div>
+      </div>
+      <div class="emp-dot"></div>
+    </div>`).join('');
+  EMP.forEach(e=>{
+    let av=document.getElementById('av'+e.id);if(!av)return;
+    let ac=av.getContext('2d');
+    ac.fillStyle=e.hair;ac.fillRect(7,0,8,4);
+    ac.fillStyle=e.skin;ac.fillRect(7,4,8,7);
+    ac.fillStyle='#050508';ac.fillRect(8,6,2,2);ac.fillRect(12,6,2,2);
+    ac.fillStyle=e.outfit;ac.fillRect(5,11,12,10);
+    ac.fillStyle='#0a0a12';ac.fillRect(6,21,4,5);ac.fillRect(12,21,4,5);
+  });
+}
+function renderTasks(){
+  document.getElementById('task-list').innerHTML=tasks.slice(-5).map(t=>`
+    <div class="task-item ${t.status}">
+      <div class="t-who" style="color:${t.status==='done'?'var(--green)':'var(--accent)'}">${t.who}</div>
+      <div class="t-what">${t.what}</div>
+      <div class="t-st">${t.status==='done'?'◆ Готово':'◆ В работе'}</div>
+    </div>`).join('');
+  document.getElementById('st').textContent=tasks.filter(t=>t.status==='doing').length;
+}
+function renderStats(){
+  let up=((Date.now()-t0)/3600000).toFixed(2);
+  document.getElementById('sv').textContent=stats.v;
+  document.getElementById('ss').textContent=stats.s;
+  document.getElementById('sc2').textContent=stats.c;
+  document.getElementById('sh').textContent=up;
+}
+function updateClock(){
+  let d=new Date();
+  document.getElementById('clock').textContent=
+    String(d.getHours()).padStart(2,'0')+':'+
+    String(d.getMinutes()).padStart(2,'0')+':'+
+    String(d.getSeconds()).padStart(2,'0');
+}
+
+window.pickEmp=function(id){
+  sel=sel===id?null:id;
+  let e=EMP.find(x=>x.id===id);
+  if(e) document.getElementById('log-txt').textContent=`${e.name} / ${e.brand} / ${e.task}`;
+  renderTeam();
+};
+
+// canvas events
+canvas.addEventListener('mousemove',e=>{
+  let r=canvas.getBoundingClientRect();
+  let sx=W/r.width,sy=H/r.height;
+  let mx=(e.clientX-r.left)*sx,my=(e.clientY-r.top)*sy;
+  let emp=hitTest(mx,my);
+  hov=emp?emp.id:null;
+  let tip=document.getElementById('tooltip');
+  if(emp){
+    tip.style.display='block';
+    let lx=e.clientX-r.left+16,ly=e.clientY-r.top-14;
+    if(lx+270>r.width)lx=e.clientX-r.left-280;
+    if(ly<10)ly=10;
+    tip.style.left=lx+'px';tip.style.top=ly+'px';
+    tip.querySelector('b').textContent=emp.name;
+    tip.querySelector('.t-role').textContent='Роль: '+emp.role;
+    tip.querySelector('.t-fit').textContent='Стиль: '+emp.brand;
+    tip.querySelector('.t-task').textContent=emp.task;
+    canvas.style.cursor='pointer';
+  } else{tip.style.display='none';canvas.style.cursor='default';}
+});
+canvas.addEventListener('click',e=>{
+  let r=canvas.getBoundingClientRect();
+  let emp=hitTest((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height);
+  if(emp)pickEmp(emp.id);
+});
+
+// task input
+document.getElementById('task-btn').addEventListener('click',addTask);
+document.getElementById('task-inp').addEventListener('keydown',e=>{if(e.key==='Enter')addTask();});
+function addTask(){
+  let inp=document.getElementById('task-inp'),v=inp.value.trim();if(!v)return;
+  let who=sel?EMP.find(e=>e.id===sel)?.name:'Писатель';
+  tasks.push({who,what:v,status:'doing'});
+  if(/script|сценар/i.test(v))stats.s++;
+  if(/cover|обложк|design|дизайн/i.test(v))stats.c++;
+  inp.value='';renderTasks();
+  document.getElementById('log-txt').textContent=`Задача → ${who}: "${v}"`;
+}
+
+// auto-work simulation
+setInterval(()=>{
+  let doing=tasks.filter(t=>t.status==='doing');
+  if(doing.length&&Math.random()>.65){doing[0].status='done';stats.v++;renderTasks();}
+  let msgs=['Пишет сценарий...','Создаёт обложку...','Записывает озвучку...','Анализирует данные...','Монтирует ролик...','Изучает тренды...','Генерирует визуал...'];
+  let e=EMP[1+Math.floor(Math.random()*(EMP.length-1))];
+  e.status=msgs[Math.floor(Math.random()*msgs.length)];
+  renderTeam();
+},4500);
+
+// ─── MAIN LOOP ───
+function loop(){
+  frame++;
+  ctx.clearRect(0,0,W,H);
+
+  drawSky();
+  drawCityGlow();
+  drawNYC();
+  drawGround();
+  drawWindow();
+
+  // bokeh dust
+  bokeh.forEach(b=>{
+    b.a+=b.va;if(b.a>0.35)b.va=-Math.abs(b.va);if(b.a<0)b.va=Math.abs(b.va);
+    b.x+=b.vx;if(b.x<0)b.x=W;if(b.x>W)b.x=0;
+    ctx.fillStyle=`rgba(200,180,255,${b.a})`;
+    ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+  });
+
+  drawFloor();
+
+  // desks
+  let S=Math.max(2,Math.floor(W/110));
+  EMP.forEach(e=>{
+    let cx=Math.floor(W*e.rx),cy=Math.floor(H*e.ry);
+    let dw=e.isCeo?S*32:S*22;
+    drawDesk(cx,cy+S*16,dw,e.isCeo);
+  });
+
+  // characters
+  EMP.forEach(e=>drawChar(e));
+
+  // rain update
+  drops.forEach(d=>{
+    d.y+=d.spd;d.x+=.5;
+    if(d.y>H*.7||d.x>W){d.y=Math.random()*H*.05;d.x=Math.random()*W;}
+  });
+
+  updateClock();renderStats();
+  requestAnimationFrame(loop);
+}
+
+renderTeam();renderTasks();loop();
+</script>
+</body>
+</html>
